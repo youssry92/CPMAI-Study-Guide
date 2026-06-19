@@ -79,6 +79,9 @@ export default function App() {
 
   const questions = data.questions || [];
   const domains = data.domains || [];
+  const mockExams = data.mockExams || [];
+  const flashcards = data.flashcards || [];
+  const studyDomains = data.studyGuide?.domains || [];
 
   useEffect(() => {
     localStorage.setItem(LS.dark, String(dark));
@@ -93,11 +96,11 @@ export default function App() {
   useEffect(() => {
     if (!examStarted || examSubmitted) return;
 
-    const t = setInterval(() => {
+    const timer = setInterval(() => {
       setSecondsLeft((s) => Math.max(0, s - 1));
     }, 1000);
 
-    return () => clearInterval(t);
+    return () => clearInterval(timer);
   }, [examStarted, examSubmitted]);
 
   useEffect(() => {
@@ -146,9 +149,11 @@ export default function App() {
       const s = query.toLowerCase();
 
       pool = pool.filter((q) => {
-        return `${q.question} ${q.topic} ${q.domainName} ${q.trap} ${q.options
-          .map((o) => o.text)
-          .join(' ')}`
+        const optionsText = Array.isArray(q.options)
+          ? q.options.map((o) => o.text).join(' ')
+          : '';
+
+        return `${q.question} ${q.topic} ${q.domainName} ${q.trap} ${optionsText}`
           .toLowerCase()
           .includes(s);
       });
@@ -173,10 +178,8 @@ export default function App() {
         const wa = weakIds.includes(a.domain) ? 0 : 1;
         const wb = weakIds.includes(b.domain) ? 0 : 1;
 
-        /*
-          Do not sort by answered/unanswered here.
-          That caused the practice question to jump immediately after answering.
-        */
+        // Important: do not sort by answered/unanswered here.
+        // Sorting by answer status caused the current question to jump after click.
         return wa - wb || a.id - b.id;
       });
     }
@@ -192,9 +195,12 @@ export default function App() {
     lockedPracticeQuestion ||
     filtered[Math.min(current, Math.max(0, filtered.length - 1))];
 
-  const exam = data.mockExams.find((e) => e.id === examId) || data.mockExams[0];
+  const exam = mockExams.find((e) => e.id === examId) || mockExams[0] || {
+    id: 1,
+    questionIds: []
+  };
 
-  const examQuestions = exam.questionIds
+  const examQuestions = (exam.questionIds || [])
     .map((id) => questions.find((q) => q.id === id))
     .filter(Boolean);
 
@@ -266,7 +272,7 @@ export default function App() {
   }
 
   function reset() {
-    if (confirm('Reset all practice answers, exam answers, bookmarks and notes?')) {
+    if (window.confirm('Reset all practice answers, exam answers, bookmarks and notes?')) {
       setAnswers({});
       setExamAnswers({});
       setBookmarks([]);
@@ -388,3 +394,643 @@ export default function App() {
           <Metric
             icon={<Trophy />}
             title="Practice Score"
+            value={`${overallRate}%`}
+            sub={`${overallDone}/4000 answered`}
+          />
+          <Metric
+            icon={<Flame />}
+            title="Adaptive Focus"
+            value={weak[0]?.name ? weak[0].name.split(' ').slice(0, 3).join(' ') : 'Start Practice'}
+            sub="Lowest mastery area"
+          />
+          <Metric
+            icon={<ClipboardList />}
+            title="Mock Format"
+            value="120 Q"
+            sub="160 minutes each"
+          />
+          <Metric
+            icon={<Bookmark />}
+            title="Bookmarks"
+            value={bookmarks.length}
+            sub="Saved for review"
+          />
+        </section>
+
+        {tab === 'home' && (
+          <Dashboard stats={stats} nav={nav} weak={weak} />
+        )}
+
+        {tab === 'guide' && (
+          <StudyGuide studyDomains={studyDomains} />
+        )}
+
+        {tab === 'practice' && (
+          <PracticePanel
+            q={practiceQ}
+            list={filtered}
+            current={current}
+            setCurrent={movePractice}
+            answer={answerPractice}
+            selected={
+              practiceQ && revealedPractice[answers[practiceQ.id]
+                : null
+            }
+            toggleBookmark={toggleBookmark}
+            bookmarks={bookmarks}
+            query={query}
+            setQuery={updateQuery}
+            domain={domain}
+            setDomain={updateDomain}
+            difficulty={difficulty}
+            setDifficulty={updateDifficulty}
+            mode={mode}
+            setMode={updateMode}
+            domains={domains}
+          />
+        )}
+
+        {tab === 'exam' && (
+          <ExamPanel
+            exams={mockExams}
+            examId={examId}
+            setExamId={setExamId}
+            startExam={startExam}
+            examStarted={examStarted}
+            examSubmitted={examSubmitted}
+            setExamSubmitted={setExamSubmitted}
+            secondsLeft={secondsLeft}
+            q={examQ}
+            list={examQuestions}
+            current={examCurrent}
+            setCurrent={moveExam}
+            answer={answerExam}
+            selected={examQ ? currentExamAnswers[examQ.id] : null}
+            answered={examAnswered}
+            score={examScore}
+            correct={examCorrect}
+            toggleBookmark={toggleBookmark}
+            bookmarks={bookmarks}
+          />
+        )}
+
+        {tab === 'flash' && (
+          <Flashcards flashcards={flashcards} domains={domains} />
+        )}
+
+        {tab === 'stats' && (
+          <Stats stats={stats} weak={weak} overallRate={overallRate} />
+        )}
+
+        {tab === 'bookmarks' && (
+          <Bookmarks
+            questions={questions}
+            bookmarks={bookmarks}
+            toggleBookmark={toggleBookmark}
+          />
+        )}
+
+        {tab === 'notes' && (
+          <Notes notes={notes} setNotes={setNotes} />
+        )}
+      </main>
+    </div>
+  );
+}
+
+function Metric({ icon, title, value, sub }) {
+  return (
+    <div className="metric">
+      <div className="metricIcon">{icon}</div>
+      <p>{title}</p>
+      <h3>{value}</h3>
+      <span>{sub}</span>
+    </div>
+  );
+}
+
+function Dashboard({ stats, nav, weak }) {
+  return (
+    <section className="panel dashboard">
+      <div className="intro">
+        <div>
+          <span className="eyebrow">Exam cockpit</span>
+          <h2>Train for the judgement patterns, not memorized dumps.</h2>
+          <p>
+            This version replaces repetitive templates with a larger scenario bank,
+            stronger distractors, detailed explanations for every option, and updated
+            120-question mock exams.
+          </p>
+        </div>
+
+        <div className="bigNumber">
+          <b>4,000</b>
+          <span>questions</span>
+        </div>
+      </div>
+
+      <div className="quick">
+        <button onClick={() => nav('guide')}>
+          <BookOpen /> Start guide
+        </button>
+        <button onClick={() => nav('practice')}>
+          <Target /> Adaptive practice
+        </button>
+        <button onClick={() => nav('exam')}>
+          <ClipboardList /> Mock exam
+        </button>
+      </div>
+
+      <h3>Recommended focus</h3>
+
+      <div className="focusGrid">
+        {weak.map((w) => (
+          <div className="focus" key={w.id} style={{ borderColor: w.color }}>
+            <b>{w.name}</b>
+            <span>
+              {w.rate}% score • {w.done}/{w.total} practiced
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <h3>Official-domain weighted roadmap</h3>
+
+      <div className="roadmap">
+        {stats.map((s) => (
+          <div className="road" key={s.id}>
+            <div>
+              <b>{s.name}</b>
+              <span>
+                {s.weight}% exam weighting • {s.total} practice questions
+              </span>
+            </div>
+
+            <strong>{s.rate}%</strong>
+
+            <div className="bar">
+              <i
+                style={{
+                  width: `${Math.max(4, s.rate)}%`,
+                  background: s.color
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function StudyGuide({ studyDomains }) {
+  const defaultId = studyDomains[0]?.id || '';
+  const [open, setOpen] = useState(defaultId);
+  const dom = studyDomains.find((d) => d.id === open) || studyDomains[0];
+
+  if (!dom) {
+    return (
+      <section className="panel">
+        <h2>Study guide not available</h2>
+      </section>
+    );
+  }
+
+  return (
+    <section className="guideLayout">
+      <div className="guideMenu">
+        {studyDomains.map((d) => (
+          <button
+            key={d.id}
+            className={open === d.id ? 'active' : ''}
+            onClick={() => setOpen(d.id)}
+            style={{ '--accent': d.color }}
+          >
+            <span>{d.weight}%</span>
+            {d.name}
+          </button>
+        ))}
+      </div>
+
+      <article className="panel guideArticle">
+        <span className="eyebrow">Comprehensive study guide</span>
+        <h2 style={{ color: dom.color }}>{dom.name}</h2>
+        <p className="lead">{dom.overview}</p>
+
+        <div className="sectionGrid">
+          {(dom.sections || []).map((sec) => (
+            <div className="studySection" key={sec.title}>
+              <h3>{sec.title}</h3>
+
+              <ul>
+                {(sec.points || []).map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+
+              <b>Exam traps</b>
+
+              <div className="chips">
+                {(sec.traps || []).map((t) => (
+                  <span key={t}>{t}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </article>
+    </section>
+  );
+}
+
+function PracticePanel(props) {
+  return (
+    <section className="panel">
+      <QuestionToolbar {...props} />
+      <QuestionCard {...props} revealOnSelect={true} examSubmitted={false} />
+    </section>
+  );
+}
+
+function QuestionToolbar({
+  query,
+  setQuery,
+  domain,
+  setDomain,
+  difficulty,
+  setDifficulty,
+  mode,
+  setMode,
+  domains,
+  list
+}) {
+  return (
+    <div className="toolbar">
+      <div className="search">
+        <Search size={18} />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search 4,000 questions by scenario, topic, trap, domain..."
+        />
+      </div>
+
+      <select value={domain} onChange={(e) => setDomain(e.target.value)}>
+        <option value="all">All domains</option>
+        {domains.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.name}
+          </option>
+        ))}
+      </select>
+
+      <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+        <option value="all">All difficulty</option>
+        <option>Foundation</option>
+        <option>Moderate</option>
+        <option>Hard</option>
+        <option>Exam Trap</option>
+      </select>
+
+      <select value={mode} onChange={(e) => setMode(e.target.value)}>
+        <option value="adaptive">Adaptive</option>
+        <option value="unanswered">Unanswered</option>
+        <option value="missed">Missed</option>
+        <option value="bookmarked">Bookmarked</option>
+      </select>
+
+      <span className="count">{list.length} results</span>
+    </div>
+  );
+}
+
+function QuestionCard({
+  q,
+  list,
+  current,
+  setCurrent,
+  answer,
+  selected,
+  toggleBookmark,
+  bookmarks,
+  revealOnSelect = false,
+  examSubmitted = false
+}) {
+  if (!q) {
+    return <div className="empty">No questions match your filters.</div>;
+  }
+
+  const reveal = (revealOnSelect && Boolean(selected)) || Boolean(examSubmitted);
+
+  return (
+    <div className="question">
+      <div className="qTop">
+        <span>
+          Question {current + 1} of {list.length} • {q.domainName} • {q.topic} • {q.difficulty}
+        </span>
+
+        <button className="iconBtn" onClick={() => toggleBookmark(q.id)}>
+          <Bookmark className={bookmarks.includes(q.id) ? 'filled' : ''} />
+        </button>
+      </div>
+
+      <h2>{q.question}</h2>
+
+      <div className="options">
+        {(q.options || []).map((opt) => {
+          const isSel = selected === opt.key;
+          const isCorrect = opt.key === q.answer;
+
+          const cls = reveal && isCorrect
+            ? 'correct'
+            : reveal && isSel && !isCorrect
+              ? 'wrong'
+              : isSel
+                ? 'selected'
+                : '';
+
+          return (
+            <button
+              key={opt.key}
+              className={cls}
+              onClick={() => answer(q.id, opt.key)}
+            >
+              <b>{opt.key}</b>
+              <span>{opt.text}</span>
+              {reveal && isCorrect && <CheckCircle2 />}
+              {reveal && isSel && !isCorrect && <XCircle />}
+            </button>
+          );
+        })}
+      </div>
+
+      {reveal && (
+        <div className="explain">
+          <h3>
+            {!selected
+              ? 'Not answered'
+              : selected === q.answer
+                ? 'Correct'
+                : 'Review this one'}
+          </h3>
+
+          <p>{q.summary}</p>
+
+          {(q.options || []).map((opt) => (
+            <div
+              key={opt.key}
+              className={opt.key === q.answer ? 'why good' : 'why'}
+            >
+              <b>{opt.key}</b>
+              <span>{q.explanations ? q.explanations[opt.key] : ''}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="pager">
+        <button onClick={() => setCurrent(current - 1)}>
+          Previous
+        </button>
+        <button onClick={() => setCurrent(current + 1)}>
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ExamPanel({
+  exams,
+  examId,
+  setExamId,
+  startExam,
+  examStarted,
+  examSubmitted,
+  setExamSubmitted,
+  secondsLeft,
+  q,
+  list,
+  current,
+  setCurrent,
+  answer,
+  selected,
+  answered,
+  score,
+  correct,
+  toggleBookmark,
+  bookmarks
+}) {
+  return (
+    <section className="panel">
+      <div className="examHead">
+        <div>
+          <span className="eyebrow">Updated mock exams</span>
+          <h2>10 full domain-weighted mock exams</h2>
+          <p className="lead">
+            Each mock exam has 120 questions, 160 minutes, and the same domain balance as the blueprint.
+          </p>
+        </div>
+
+        <div className="timer">
+          <Timer /> {mmss(secondsLeft)}
+        </div>
+      </div>
+
+      <div className="mockGrid">
+        {exams.map((e) => (
+          <button
+            key={e.id}
+            className={examId === e.id ? 'active' : ''}
+            onClick={() => setExamId(e.id)}
+          >
+            {e.name}
+          </button>
+        ))}
+      </div>
+
+      <div className="examActions">
+        <button onClick={() => startExam(examId)}>
+          <Rocket /> Start / Restart selected mock
+        </button>
+
+        {examStarted && !examSubmitted && (
+          <button onClick={() => setExamSubmitted(true)}>
+            <CheckCircle2 /> Submit exam
+          </button>
+        )}
+      </div>
+
+      {examStarted && (
+        <div>
+          <div className="examProgress">
+            <span>
+              {answered}/{list.length} answered
+            </span>
+            <span>
+              {examSubmitted
+                ? `Score ${score}% (${correct}/${list.length})`
+                : 'Explanations hidden until submit'}
+            </span>
+          </div>
+
+          <QuestionCard
+            q={q}
+            list={list}
+            current={current}
+            setCurrent={setCurrent}
+            answer={answer}
+            selected={selected}
+            toggleBookmark={toggleBookmark}
+            bookmarks={bookmarks}
+            revealOnSelect={false}
+            examSubmitted={examSubmitted}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Flashcards({ flashcards, domains }) {
+  const [i, setI] = useState(0);
+  const [flip, setFlip] = useState(false);
+
+  if (!flashcards.length) {
+    return (
+      <section className="panel center">
+        <h2>No flashcards available</h2>
+      </section>
+    );
+  }
+
+  const card = flashcards[i] || flashcards[0];
+  const dom = domains.find((d) => d.id === card.domain) || {
+    name: 'CPMAI',
+    color: '#111827'
+  };
+
+  return (
+    <section className="panel center">
+      <span className="eyebrow">Flashcards</span>
+      <h2>High-yield recall and exam traps</h2>
+      <p className="lead">
+        Card {i + 1} of {flashcards.length} • {dom.name}
+      </p>
+
+      <button
+        className="flash"
+        style={{ background: `linear-gradient(135deg, ${dom.color}, #111827)` }}
+        onClick={() => setFlip(!flip)}
+      >
+        {flip ? card.back : card.front}
+      </button>
+
+      <div className="pager centerPager">
+        <button
+          onClick={() => {
+            setI(Math.max(0, i - 1));
+            setFlip(false);
+          }}
+        >
+          Previous
+        </button>
+
+        <button onClick={() => setFlip(!flip)}>
+          {flip ? 'Show front' : 'Show answer'}
+        </button>
+
+        <button
+          onClick={() => {
+            setI((i + 1) % flashcards.length);
+            setFlip(false);
+          }}
+        >
+          Next
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function Stats({ stats, weak, overallRate }) {
+  return (
+    <section className="panel">
+      <span className="eyebrow">Performance analytics</span>
+      <h2>Weak-area recommendations</h2>
+      <p className="lead">
+        Overall practice score: <b>{overallRate}%</b>. Next focus:{' '}
+        <b>{weak.map((w) => w.name).join(' and ')}</b>.
+      </p>
+
+      {stats.map((s) => (
+        <div className="stat" key={s.id}>
+          <div>
+            <b>{s.name}</b>
+            <span>
+              {s.done}/{s.total} answered • {s.correct} correct • {s.missed} missed
+            </span>
+          </div>
+
+          <strong>{s.rate}%</strong>
+
+          <div className="bar">
+            <i
+              style={{
+                width: `${Math.max(3, s.rate)}%`,
+                background: s.color
+              }}
+            />
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function Bookmarks({ questions, bookmarks, toggleBookmark }) {
+  const saved = questions.filter((q) => bookmarks.includes(q.id));
+
+  return (
+    <section className="panel">
+      <span className="eyebrow">Saved review</span>
+      <h2>Bookmarked questions</h2>
+
+      {!saved.length && (
+        <p className="lead">No bookmarked questions yet.</p>
+      )}
+
+      {saved.slice(0, 500).map((q) => (
+        <div className="saved" key={q.id}>
+          <button className="iconBtn" onClick={() => toggleBookmark(q.id)}>
+            <Bookmark className="filled" />
+          </button>
+
+          <div>
+            <b>Q{q.id} • {q.topic}</b>
+            <p>{q.question}</p>
+            <small>{q.summary}</small>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function Notes({ notes, setNotes }) {
+  return (
+    <section className="panel">
+      <span className="eyebrow">Offline notes</span>
+      <h2>Your CPMAI notebook</h2>
+      <p className="lead">
+        Saved locally in this browser. Use it for missed-question patterns and exam traps.
+      </p>
+
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Example: If the answer rushes to model training before problem/data/governance readiness, it is probably a trap..."
+      />
+    </section>
+  );
+}
