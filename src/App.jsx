@@ -219,19 +219,21 @@ export default function App() {
     setLockedPracticeQuestionId(null);
   }
 
+
 function answerPractice(qid, key) {
   setLockedPracticeQuestionId(qid);
 
   setAnswers((prev) => ({
     ...prev,
-    key
+    [qid]: key
   }));
 
   setRevealedPractice((prev) => ({
     ...prev,
-    true
+    [qid]: true
   }));
 }
+
 
   function movePractice(nextIndex) {
     setLockedPracticeQuestionId(null);
@@ -247,12 +249,13 @@ function answerPractice(qid, key) {
 function answerExam(qid, key) {
   setExamAnswers((prev) => ({
     ...prev,
-    {
+    [examKey]: {
       ...(prev[examKey] || {}),
-      key
+      [qid]: key
     }
   }));
 }
+
 
   function moveExam(nextIndex) {
     setExamCurrent(
