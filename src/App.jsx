@@ -71,9 +71,8 @@ export default function App() {
 
   /*
     answers = saved answer history.
-    revealedPractice = whether this question has been answered/revealed in this session.
-    lockedPracticeQuestionId = keeps the current question visible after answering,
-    preventing adaptive mode from re-sorting and jumping to another question.
+    revealedPractice = questions revealed in the current browser session.
+    lockedPracticeQuestionId = prevents adaptive sorting from jumping to another question after answer click.
   */
   const [revealedPractice, setRevealedPractice] = useState({});
   const [lockedPracticeQuestionId, setLockedPracticeQuestionId] = useState(null);
@@ -202,10 +201,12 @@ export default function App() {
     filtered[Math.min(current, Math.max(0, filtered.length - 1))];
 
   const exam = data.mockExams.find((e) => e.id === examId) || data.mockExams[0];
+
   const examQuestions = exam.questionIds
     .map((id) => questions.find((q) => q.id === id))
     .filter(Boolean);
-  const examQ = examQuestions[examCurrent];
+
+  const examQ = examQuestions[Math.min(examCurrent, Math.max(0, examQuestions.length - 1))];
 
   const examKey = 'exam' + examId;
   const currentExamAnswers = examAnswers[examKey] || {};
@@ -253,6 +254,15 @@ export default function App() {
         [qid]: key
       }
     }));
+  }
+
+  function moveExam(nextIndex) {
+    setExamCurrent(
+      Math.max(
+        0,
+        Math.min(examQuestions.length - 1, nextIndex)
+      )
+    );
   }
 
   function toggleBookmark(id) {
@@ -454,7 +464,7 @@ export default function App() {
             q={examQ}
             list={examQuestions}
             current={examCurrent}
-            setCurrent={setExamCurrent}
+            setCurrent={moveExam}
             answer={answerExam}
             selected={examQ ? currentExamAnswers[examQ.id] : null}
             answered={examAnswered}
@@ -500,8 +510,7 @@ function Metric({ icon, title, value, sub }) {
 
 function Dashboard({ stats, nav, weak }) {
   return (
-    <section className="panel dashboard">
-      <div className="intro">
+    <section className="panel ="intro">
         <div>
           <span className="eyebrow">Exam cockpit</span>
           <h2>Train for the judgement patterns, not memorized dumps.</h2>
@@ -582,7 +591,7 @@ function StudyGuide() {
       <article className="panel guideArticle">
         <span className="eyebrow">Comprehensive study guide</span>
         <h2 style={{ color: dom.color }}>{dom.name}</h2>
-     view}</p>
+        <p className="lead">{dom.overview}</p>
 
         <div className="sectionGrid">
           {dom.sections.map((sec) => (
