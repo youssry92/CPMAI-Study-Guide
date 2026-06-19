@@ -219,19 +219,19 @@ export default function App() {
     setLockedPracticeQuestionId(null);
   }
 
-  function answerPractice(qid, key) {
-    setLockedPracticeQuestionId(qid);
+function answerPractice(qid, key) {
+  setLockedPracticeQuestionId(qid);
 
-    setAnswers((prev) => ({
-      ...prev,
-      [qid]: key
-    }));
+  setAnswers((prev) => ({
+    ...prev,
+    key
+  }));
 
-    setRevealedPractice((prev) => ({
-      ...prev,
-      [qid]: true
-    }));
-  }
+  setRevealedPractice((prev) => ({
+    ...prev,
+    true
+  }));
+}
 
   function movePractice(nextIndex) {
     setLockedPracticeQuestionId(null);
@@ -244,15 +244,15 @@ export default function App() {
     );
   }
 
-  function answerExam(qid, key) {
-    setExamAnswers((prev) => ({
-      ...prev,
-      [examKey]: {
-        ...(prev[examKey] || {}),
-        [qid]: key
-      }
-    }));
-  }
+function answerExam(qid, key) {
+  setExamAnswers((prev) => ({
+    ...prev,
+    {
+      ...(prev[examKey] || {}),
+      key
+    }
+  }));
+}
 
   function moveExam(nextIndex) {
     setExamCurrent(
@@ -425,30 +425,31 @@ export default function App() {
           <StudyGuide studyDomains={studyDomains} />
         )}
 
-        {tab === 'practice' && (
-          <PracticePanel
-            q={practiceQ}
-            list={filtered}
-            current={current}
-            setCurrent={movePractice}
-            answer={answerPractice}
-            selected={
-              practiceQ && revealedPractice[answers[practiceQ.id]
-                : null
-            }
-            toggleBookmark={toggleBookmark}
-            bookmarks={bookmarks}
-            query={query}
-            setQuery={updateQuery}
-            domain={domain}
-            setDomain={updateDomain}
-            difficulty={difficulty}
-            setDifficulty={updateDifficulty}
-            mode={mode}
-            setMode={updateMode}
-            domains={domains}
-          />
-        )}
+{tab === 'practice' && (
+  <PracticePanel
+    q={practiceQ}
+    list={filtered}
+    current={current}
+    setCurrent={movePractice}
+    answer={answerPractice}
+    selected={
+      practiceQ && revealedPractice[practiceQ.id]
+        ? answers[practiceQ.id]
+        : null
+    }
+    toggleBookmark={toggleBookmark}
+    bookmarks={bookmarks}
+    query={query}
+    setQuery={updateQuery}
+    domain={domain}
+    setDomain={updateDomain}
+    difficulty={difficulty}
+    setDifficulty={updateDifficulty}
+    mode={mode}
+    setMode={updateMode}
+    domains={domains}
+  />
+)}
 
         {tab === 'exam' && (
           <ExamPanel
