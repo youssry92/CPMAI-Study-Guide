@@ -68,12 +68,6 @@ export default function App() {
   const [mode, setMode] = useState('adaptive');
 
   const [current, setCurrent] = useState(0);
-
-  /*
-    answers = saved answer history.
-    revealedPractice = questions revealed in the current browser session.
-    lockedPracticeQuestionId = prevents adaptive sorting from jumping to another question after answer click.
-  */
   const [revealedPractice, setRevealedPractice] = useState({});
   const [lockedPracticeQuestionId, setLockedPracticeQuestionId] = useState(null);
 
@@ -510,7 +504,8 @@ function Metric({ icon, title, value, sub }) {
 
 function Dashboard({ stats, nav, weak }) {
   return (
-    <section className="panel ="intro">
+    <section className="panel dashboard">
+      <div className="intro">
         <div>
           <span className="eyebrow">Exam cockpit</span>
           <h2>Train for the judgement patterns, not memorized dumps.</h2>
@@ -555,9 +550,7 @@ function Dashboard({ stats, nav, weak }) {
           <div className="road" key={s.id}>
             <div>
               <b>{s.name}</b>
-              <span>{s.weight}% exam weighting • {s.total} practice questions</span>
-            </div>
-            <strong>{s.rate}%</strong>
+              <span>{s.weight}% exam weighting • {s.total} practice questions</span <strong>{s.rate}%</strong>
             <div className="bar">
               <i style={{ width: `${Math.max(4, s.rate)}%`, background: s.color }} />
             </div>
