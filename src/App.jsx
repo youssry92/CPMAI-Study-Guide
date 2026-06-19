@@ -78,11 +78,11 @@ export default function App(){
   const examScore = pct(examCorrect, examQuestions.length);
 
   function nav(id){ setTab(id); setMobileOpen(false); setCurrent(0); }
-  function answerPractice(qid,key){   setAnswers(prev=>({...prev,[qid]:key}));   setRevealedPractice(prev=>({...prev,[qid]:true})); } `
+  function answerPractice(qid,key){  setAnswers(prev => ({ ...prev, [qid]: key }));  setRevealedPractice(prev => ({ ...prev, [qid]: true }));}  
   function answerExam(qid,key){ setExamAnswers(prev=>({...prev,[examKey]:{...(prev[examKey]||{}),[qid]:key}})); }
   function toggleBookmark(id){ setBookmarks(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]); }
   function reset(){ if(confirm('Reset all practice answers, exam answers, bookmarks and notes?')){ setAnswers({}); setExamAnswers({}); setBookmarks([]); setNotes(''); } }
-  function startExam(id){ setExamId(id); setExamStarted(true); setExamSubmitted(false); setExamCurrent(0); setSecondsLeft(160*60); setExamAnswers(prev=>({...prev,[`exam${id}`]:{}})); }
+  function startExam(id){   setExamId(id);   setExamStarted(true);   setExamSubmitted(false);   setExamCurrent(0);   setSecondsLeft(160 * 60);   setExamAnswers(prev => {     const updated = { ...prev };     updated['exam' + id] = {};     return updated;   }); }
 
   const navItems = [['home',Home,'Dashboard'],['guide',BookOpen,'Study Guide'],['practice',Target,'Practice'],['exam',ClipboardList,'Mock Exams'],['flash',Brain,'Flashcards'],['stats',BarChart3,'Stats'],['bookmarks',Bookmark,'Bookmarks'],['notes',StickyNote,'Notes']];
   return <div className={`app ${dark?'dark':''}`}>
