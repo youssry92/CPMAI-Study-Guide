@@ -1,13 +1,12 @@
 {
-  "name": "CPMAI Exam Studio",
-  "short_name": "CPMAI Studio",
-  "description": "Offline CPMAI study guide, flashcards, practice mode, mock exams, notes, bookmarks, and adaptive progress tracking.",
+  "name": "CPMAI Exam Studio v2 Premium",
+  "short_name": "CPMAI v2",
+  "description": "Offline CPMAI exam-prep PWA with 4000 original exam-style questions and 10 updated mock exams.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#111827",
+  "theme_color": "#111827",
   "icons": [
     {
       "src": "/icons/icon-192.png",
