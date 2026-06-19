@@ -70,12 +70,13 @@ export default function App() {
   const [current, setCurrent] = useState(0);
 
   /*
-    Important:
     answers = saved answer history.
-    revealedPractice = whether the user has clicked this question in the current practice session.
-    This prevents already-saved answers from auto-highlighting when the question first appears.
+    revealedPractice = whether this question has been answered/revealed in this session.
+    lockedPracticeQuestionId = keeps the current question visible after answering,
+    preventing adaptive mode from re-sorting and jumping to another question.
   */
   const [revealedPractice, setRevealedPractice] = useState({});
+  const [lockedPracticeQuestionId, setLockedPracticeQuestionId] = useState(null);
 
   const [examId, setExamId] = useState(() => Number(localStorage.getItem(LS.currentExam) || 1));
   const [examCurrent, setExamCurrent] = useState(0);
@@ -131,7 +132,9 @@ export default function App() {
   }, [answers, domains, questions]);
 
   const weak = useMemo(() => {
-    return [...stats].sort((a, b) => (a.rate - b.rate) || (a.done - b.done)).slice(0, 2);
+    return [...stats]
+      .sort((a, b) => (a.rate - b.rate) || (a.done - b.done))
+      .slice(0, 2);
   }, [stats]);
 
   const overallDone = Object.keys(answers).length;
@@ -140,14 +143,19 @@ export default function App() {
 
   const filtered = useMemo(() => {
     let pool = questions.filter((q) => {
-      return (domain === 'all' || q.domain === domain) &&
-        (difficulty === 'all' || q.difficulty === difficulty);
+      return (
+        (domain === 'all' || q.domain === domain) &&
+        (difficulty === 'all' || q.difficulty === difficulty)
+      );
     });
 
     if (query.trim()) {
       const s = query.toLowerCase();
+
       pool = pool.filter((q) => {
-        return `${q.question} ${q.topic} ${q.domainName} ${q.trap} ${q.options.map((o) => o.text).join(' ')}`
+        return `${q.question} ${q.topic} ${q.domainName} ${q.trap} ${q.options
+          .map((o) => o.text)
+          .join(' ')}`
           .toLowerCase()
           .includes(s);
       });
@@ -171,20 +179,32 @@ export default function App() {
       pool = [...pool].sort((a, b) => {
         const wa = weakIds.includes(a.domain) ? 0 : 1;
         const wb = weakIds.includes(b.domain) ? 0 : 1;
-        const aa = answers[a.id] ? 1 : 0;
-        const ab = answers[b.id] ? 1 : 0;
 
-        return wa - wb || aa - ab || a.id - b.id;
+        /*
+          Important:
+          Do NOT sort by answered/unanswered here.
+          Sorting by answered status causes the displayed question to jump
+          immediately after the learner selects an answer.
+        */
+        return wa - wb || a.id - b.id;
       });
     }
 
     return pool;
   }, [questions, domain, difficulty, query, mode, answers, bookmarks, weak]);
 
-  const practiceQ = filtered[Math.min(current, Math.max(0, filtered.length - 1))];
+  const lockedPracticeQuestion = lockedPracticeQuestionId
+    ? questions.find((q) => q.id === lockedPracticeQuestionId)
+    : null;
+
+  const practiceQ =
+    lockedPracticeQuestion ||
+    filtered[Math.min(current, Math.max(0, filtered.length - 1))];
 
   const exam = data.mockExams.find((e) => e.id === examId) || data.mockExams[0];
-  const examQuestions = exam.questionIds.map((id) => questions.find((q) => q.id === id)).filter(Boolean);
+  const examQuestions = exam.questionIds
+    .map((id) => questions.find((q) => q.id === id))
+    .filter(Boolean);
   const examQ = examQuestions[examCurrent];
 
   const examKey = 'exam' + examId;
@@ -197,9 +217,12 @@ export default function App() {
     setTab(id);
     setMobileOpen(false);
     setCurrent(0);
+    setLockedPracticeQuestionId(null);
   }
 
   function answerPractice(qid, key) {
+    setLockedPracticeQuestionId(qid);
+
     setAnswers((prev) => ({
       ...prev,
       [qid]: key
@@ -209,6 +232,17 @@ export default function App() {
       ...prev,
       [qid]: true
     }));
+  }
+
+  function movePractice(nextIndex) {
+    setLockedPracticeQuestionId(null);
+
+    setCurrent(
+      Math.max(
+        0,
+        Math.min(filtered.length - 1, nextIndex)
+      )
+    );
   }
 
   function answerExam(qid, key) {
@@ -236,6 +270,7 @@ export default function App() {
       setBookmarks([]);
       setNotes('');
       setRevealedPractice({});
+      setLockedPracticeQuestionId(null);
       setCurrent(0);
       setExamCurrent(0);
       setExamStarted(false);
@@ -256,6 +291,30 @@ export default function App() {
       updated['exam' + id] = {};
       return updated;
     });
+  }
+
+  function updateDomain(value) {
+    setDomain(value);
+    setCurrent(0);
+    setLockedPracticeQuestionId(null);
+  }
+
+  function updateDifficulty(value) {
+    setDifficulty(value);
+    setCurrent(0);
+    setLockedPracticeQuestionId(null);
+  }
+
+  function updateMode(value) {
+    setMode(value);
+    setCurrent(0);
+    setLockedPracticeQuestionId(null);
+  }
+
+  function updateQuery(value) {
+    setQuery(value);
+    setCurrent(0);
+    setLockedPracticeQuestionId(null);
   }
 
   const navItems = [
@@ -351,7 +410,7 @@ export default function App() {
         </section>
 
         {tab === 'home' && (
-          <Dashboard domains={domains} stats={stats} nav={nav} weak={weak} />
+          <Dashboard stats={stats} nav={nav} weak={weak} />
         )}
 
         {tab === 'guide' && <StudyGuide />}
@@ -361,7 +420,7 @@ export default function App() {
             q={practiceQ}
             list={filtered}
             current={current}
-            setCurrent={setCurrent}
+            setCurrent={movePractice}
             answer={answerPractice}
             selected={
               practiceQ && revealedPractice[practiceQ.id]
@@ -371,13 +430,13 @@ export default function App() {
             toggleBookmark={toggleBookmark}
             bookmarks={bookmarks}
             query={query}
-            setQuery={setQuery}
+            setQuery={updateQuery}
             domain={domain}
-            setDomain={setDomain}
+            setDomain={updateDomain}
             difficulty={difficulty}
-            setDifficulty={setDifficulty}
+            setDifficulty={updateDifficulty}
             mode={mode}
-            setMode={setMode}
+            setMode={updateMode}
             domains={domains}
           />
         )}
@@ -398,7 +457,6 @@ export default function App() {
             setCurrent={setExamCurrent}
             answer={answerExam}
             selected={examQ ? currentExamAnswers[examQ.id] : null}
-            answers={currentExamAnswers}
             answered={examAnswered}
             score={examScore}
             correct={examCorrect}
@@ -524,7 +582,7 @@ function StudyGuide() {
       <article className="panel guideArticle">
         <span className="eyebrow">Comprehensive study guide</span>
         <h2 style={{ color: dom.color }}>{dom.name}</h2>
-        <p className="lead">{dom.overview}</p>
+     view}</p>
 
         <div className="sectionGrid">
           {dom.sections.map((sec) => (
@@ -575,7 +633,8 @@ function QuestionToolbar({
       <div className="search">
         <Search size={18} />
         <input
-          value={> setQuery(e.target.value)}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="Search 4,000 questions by scenario, topic, trap, domain..."
         />
       </div>
@@ -631,6 +690,7 @@ function QuestionCard({
         <span>
           Question {current + 1} of {list.length} • {q.domainName} • {q.topic} • {q.difficulty}
         </span>
+
         <button className="iconBtn" onClick={() => toggleBookmark(q.id)}>
           <Bookmark className={bookmarks.includes(q.id) ? 'filled' : ''} />
         </button>
@@ -691,10 +751,10 @@ function QuestionCard({
       )}
 
       <div className="pager">
-        <button onClick={() => setCurrent(Math.max(0, current - 1))}>
+        <button onClick={() => setCurrent(current - 1)}>
           Previous
         </button>
-        <button onClick={() => setCurrent(Math.min(list.length - 1, current + 1))}>
+        <button onClick={() => setCurrent(current + 1)}>
           Next
         </button>
       </div>
